@@ -1,6 +1,7 @@
 # Substrate Cumulus Parachain Template
 
-This uses polkadot version: 0.9.26
+Polkadot version v0.9.26
+Rust version: 1.64-nightly
 
 A new [Cumulus](https://github.com/paritytech/cumulus/)-based Substrate node, ready for hacking ☁️..
 
