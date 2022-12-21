@@ -5,6 +5,7 @@
 // Make the WASM binary available.
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
+const CONTRACTS_DEBUG_OUTPUT: bool = true;
 
 mod weights;
 pub mod xcm_config;
@@ -27,7 +28,7 @@ use sp_version::RuntimeVersion;
 
 use frame_support::{
 	construct_runtime, parameter_types,
-	traits::Everything,
+	traits::{Everything,ConstU32},
 	weights::{
 		constants::WEIGHT_PER_SECOND, ConstantMultiplier, DispatchClass, Weight,
 		WeightToFeeCoefficient, WeightToFeeCoefficients, WeightToFeePolynomial,
@@ -197,6 +198,14 @@ pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
 
+pub const MILLICENTS: Balance = 1_000_000_000;
+pub const CENTS: Balance = 1_000 * MILLICENTS;
+pub const DOLLARS: Balance = 100 * CENTS;
+
+const fn deposit(items: u32, bytes: u32) -> Balance {
+items as Balance * 15 * CENTS + (bytes as Balance) * 6 * CENTS
+}
+
 // Unit = the base number of indivisible units for balances
 pub const UNIT: Balance = 1_000_000_000_000;
 pub const MILLIUNIT: Balance = 1_000_000_000;
@@ -249,6 +258,7 @@ parameter_types! {
 		})
 		.avg_block_initialization(AVERAGE_ON_INITIALIZE_RATIO)
 		.build_or_panic();
+	pub OtherBlockWeights: frame_system::limits::BlockWeights = frame_system::limits::BlockWeights::with_sensible_defaults(2 * WEIGHT_PER_SECOND, NORMAL_DISPATCH_RATIO);
 	pub const SS58Prefix: u16 = 42;
 }
 
@@ -459,6 +469,39 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
+impl pallet_randomness_collective_flip::Config for Runtime {}
+
+parameter_types! {
+	pub const DepositPerItem: Balance = deposit(1, 0);
+	pub const DepositPerByte: Balance = deposit(0, 1);
+	pub const DeletionQueueDepth: u32 = 128;
+	pub DeletionWeightLimit: Weight = AVERAGE_ON_INITIALIZE_RATIO * OtherBlockWeights::get().max_block;
+	pub Schedule: pallet_contracts::Schedule<Runtime> = Default::default();
+  }
+  
+  impl pallet_contracts::Config for Runtime {
+	type Time = Timestamp;
+	type Randomness = RandomnessCollectiveFlip;
+	type Currency = Balances;
+	type Event = Event;
+	type Call = Call;
+	type CallFilter = frame_support::traits::Nothing;
+	type WeightPrice = pallet_transaction_payment::Pallet<Self>;
+	type WeightInfo = pallet_contracts::weights::SubstrateWeight<Self>;
+	type ChainExtension = ();
+	type Schedule = Schedule;
+	type CallStack = [pallet_contracts::Frame<Self>; 31];
+	type DeletionQueueDepth = DeletionQueueDepth;
+	type DeletionWeightLimit = DeletionWeightLimit;
+	type DepositPerByte = DepositPerByte;
+	type DepositPerItem = DepositPerItem;
+	type AddressGenerator = pallet_contracts::DefaultAddressGenerator;
+	type ContractAccessWeight = pallet_contracts::DefaultContractAccessWeight<OtherBlockWeights>;
+	type MaxCodeLen = ConstU32<{ 256 * 1024 }>;
+	type RelaxedMaxCodeLen = ConstU32<{ 512 * 1024 }>;
+	type MaxStorageKeyLen = ConstU32<{ 512 * 1024 }>;
+  }
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -493,6 +536,8 @@ construct_runtime!(
 
 		// Template
 		TemplatePallet: pallet_template::{Pallet, Call, Storage, Event<T>}  = 40,
+		Contracts: pallet_contracts,
+		RandomnessCollectiveFlip: pallet_randomness_collective_flip,	
 	}
 );
 
@@ -513,6 +558,46 @@ mod benches {
 }
 
 impl_runtime_apis! {
+	/*** Add this block ***/
+impl pallet_contracts_rpc_runtime_api::ContractsApi<Block, AccountId, Balance, BlockNumber, Hash> for Runtime {
+	fn call(
+	   origin: AccountId,
+	   dest: AccountId,
+	   value: Balance,
+	   gas_limit: u64,
+	   storage_deposit_limit: Option<Balance>,
+	   input_data: Vec<u8>,
+	) -> pallet_contracts_primitives::ContractExecResult<Balance> {
+	   Contracts::bare_call(origin, dest, value, gas_limit, storage_deposit_limit, input_data, CONTRACTS_DEBUG_OUTPUT)
+	}
+	
+	fn instantiate(
+	   origin: AccountId,
+	   value: Balance,
+	   gas_limit: u64,
+	   storage_deposit_limit: Option<Balance>,
+	   code: pallet_contracts_primitives::Code<Hash>,
+	   data: Vec<u8>,
+	   salt: Vec<u8>,
+	) -> pallet_contracts_primitives::ContractInstantiateResult<AccountId, Balance> {
+	   Contracts::bare_instantiate(origin, value, gas_limit, storage_deposit_limit, code, data, salt, CONTRACTS_DEBUG_OUTPUT)
+	}
+	   
+	fn upload_code(
+	   origin: AccountId,
+	   code: Vec<u8>,
+	   storage_deposit_limit: Option<Balance>,
+	) -> pallet_contracts_primitives::CodeUploadResult<Hash, Balance> {
+	   Contracts::bare_upload_code(origin, code, storage_deposit_limit)
+	}
+	
+	fn get_storage(
+	   address: AccountId,
+	   key: Vec<u8>,
+	) -> pallet_contracts_primitives::GetStorageResult {
+	   Contracts::get_storage(address, key)
+	}
+  }
 	impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
 		fn slot_duration() -> sp_consensus_aura::SlotDuration {
 			sp_consensus_aura::SlotDuration::from_millis(Aura::slot_duration())

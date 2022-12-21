@@ -53,6 +53,10 @@ sp-session = { git = "https://github.com/paritytech/substrate", default-features
 sp-std = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.26" }
 sp-transaction-pool = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.26" }
 sp-version = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.26" }
+pallet-contracts = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+pallet-contracts-primitives = { version = "6.0.0", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+pallet-randomness-collective-flip = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+pallet-contracts-rpc-runtime-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
 
 # Polkadot
 pallet-xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.26" }
@@ -125,6 +129,11 @@ std = [
 	"xcm-builder/std",
 	"xcm-executor/std",
 	"xcm/std",
+	"pallet-contracts/std",
+  	"pallet-contracts-primitives/std",
+	"pallet-randomness-collective-flip/std",
+	"pallet-contracts-rpc-runtime-api/std"
+
 ]
 
 runtime-benchmarks = [
@@ -147,4 +156,13 @@ runtime-benchmarks = [
 try-runtime = [
 	"frame-executive/try-runtime",
 	"frame-try-runtime",
+	"pallet-aura/try-runtime",
+	"pallet-balances/try-runtime",
+	"pallet-randomness-collective-flip/try-runtime",
+	"pallet-sudo/try-runtime",
+	"pallet-template/try-runtime",
+	"pallet-timestamp/try-runtime",
+	"pallet-transaction-payment/try-runtime",
+	"pallet-contracts/try-runtime"
+
 ]
